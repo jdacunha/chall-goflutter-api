@@ -19,10 +19,10 @@ import (
 type UserService interface {
 	Get(ctx context.Context, id int) (types.UserBasic, error)
 	Invite(ctx context.Context, input map[string]interface{}) error
-	Pay(ctx context.Context, input map[string]interface{}) error
+	Distribute(ctx context.Context, input map[string]interface{}) error
 
-	SignUp(ctx context.Context, input map[string]interface{}) error
-	SignIn(ctx context.Context, input map[string]interface{}) (types.UserBasicWithToken, error)
+	Register(ctx context.Context, input map[string]interface{}) error
+	Login(ctx context.Context, input map[string]interface{}) (types.UserBasicWithToken, error)
 	GetMe(ctx context.Context) (types.UserBasic, error)
 }
 
@@ -107,7 +107,7 @@ func (s *Service) Invite(ctx context.Context, input map[string]interface{}) erro
 	return nil
 }
 
-func (s *Service) Pay(ctx context.Context, input map[string]interface{}) error {
+func (s *Service) Distribute(ctx context.Context, input map[string]interface{}) error {
 	childId, err := utils.GetIntFromMap(input, "child_id")
 	if err != nil {
 		return errors.CustomError{
@@ -190,7 +190,7 @@ func (s *Service) Pay(ctx context.Context, input map[string]interface{}) error {
 	return nil
 }
 
-func (s *Service) SignUp(ctx context.Context, input map[string]interface{}) error {
+func (s *Service) Register(ctx context.Context, input map[string]interface{}) error {
 	_, err := s.store.FindByEmail(input["email"].(string))
 	if err == nil {
 		return errors.CustomError{
@@ -224,7 +224,7 @@ func (s *Service) SignUp(ctx context.Context, input map[string]interface{}) erro
 	return nil
 }
 
-func (s *Service) SignIn(ctx context.Context, input map[string]interface{}) (types.UserBasicWithToken, error) {
+func (s *Service) Login(ctx context.Context, input map[string]interface{}) (types.UserBasicWithToken, error) {
 	user, err := s.store.FindByEmail(input["email"].(string))
 	if err != nil {
 		if goErrors.Is(err, sql.ErrNoRows) {
