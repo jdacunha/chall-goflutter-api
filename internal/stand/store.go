@@ -56,3 +56,9 @@ func (s *Store) Update(id int, input map[string]interface{}) error {
 
 	return err
 }
+
+func (s *Store) UpdateStock(id int, quantity int) error {
+	_, err := s.db.Exec(queryUpdateStock, quantity, id)
+
+	return err
+}
