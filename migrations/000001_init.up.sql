@@ -2,6 +2,7 @@
 CREATE TYPE user_role_enum AS ENUM ('ORGANISATEUR', 'TENEUR_STAND', 'PARENT', 'ENFANT');
 CREATE TYPE stand_type_enum AS ENUM ('VENTE', 'ACTIVITE');
 CREATE TYPE statut_enum AS ENUM ('STARTED', 'ENDED');
+CREATE TYPE interaction_type_enum AS ENUM ('TRANSACTION', 'ACTIVITE');
 
 
 -- Table: users 
@@ -49,4 +50,16 @@ CREATE TABLE "kermesses_stands" (
   "kermesse_id" INTEGER NOT NULL REFERENCES "kermesses"("id"),
   "stand_id" INTEGER NOT NULL REFERENCES "stands"("id"),
   UNIQUE ("kermesse_id", "stand_id")
+);
+
+--- Table: Interactions
+CREATE TABLE "interactions" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" INTEGER NOT NULL REFERENCES "users"("id"),
+  "kermesse_id" INTEGER NOT NULL REFERENCES "kermesses"("id"),
+  "stand_id" INTEGER NOT NULL REFERENCES "stands"("id"),
+  "type" interaction_type_enum NOT NULL,
+  "statut" statut_enum NOT NULL DEFAULT 'STARTED',
+  "jetons" INTEGER NOT NULL DEFAULT 0,
+  "points" INTEGER NOT NULL DEFAULT 0
 );
