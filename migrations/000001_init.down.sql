@@ -2,6 +2,8 @@
 DROP TABLE IF EXISTS "users";
 DROP TABLE IF EXISTS "stands";
 DROP TABLE IF EXISTS "kermesses";
+DROP TABLE IF EXISTS "kermesses_stands";
+DROP TABLE IF EXISTS "kermesses_users";
 
 -- Drop types
 DROP TYPE IF EXISTS user_role_enum;

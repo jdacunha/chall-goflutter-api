@@ -27,6 +27,8 @@ const (
 	queryFindKermesseById = "SELECT * FROM kermesses WHERE id=$1"
 	queryCreateKermesse   = "INSERT INTO kermesses (user_id, name, description) VALUES ($1, $2, $3)"
 	queryUpdateKermesse   = "UPDATE kermesses SET name=$1, description=$2 WHERE id=$3"
+	queryAddParticipant   = "INSERT INTO kermesses_users (kermesse_id, user_id) VALUES ($1, $2)"
+	queryAddStand         = "INSERT INTO kermesses_stands (kermesse_id, stand_id) VALUES ($1, $2)"
 )
 
 func (s *Store) FindAll() ([]types.Kermesse, error) {
@@ -51,6 +53,18 @@ func (s *Store) Create(input map[string]interface{}) error {
 
 func (s *Store) Update(id int, input map[string]interface{}) error {
 	_, err := s.db.Exec(queryUpdateKermesse, input["name"], input["description"], id)
+
+	return err
+}
+
+func (s *Store) AddParticipant(input map[string]interface{}) error {
+	_, err := s.db.Exec(queryAddParticipant, input["kermesse_id"], input["user_id"])
+
+	return err
+}
+
+func (s *Store) AddStand(input map[string]interface{}) error {
+	_, err := s.db.Exec(queryAddStand, input["kermesse_id"], input["stand_id"])
 
 	return err
 }

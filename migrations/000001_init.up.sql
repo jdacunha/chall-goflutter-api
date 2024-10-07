@@ -4,7 +4,7 @@ CREATE TYPE stand_type_enum AS ENUM ('VENTE', 'ACTIVITE');
 CREATE TYPE statut_enum AS ENUM ('STARTED', 'ENDED');
 
 
--- Table: users
+-- Table: users 
 CREATE TABLE "users" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
@@ -15,7 +15,16 @@ CREATE TABLE "users" (
   "parent_id" INTEGER REFERENCES "users"("id") DEFAULT NULL
 );
 
--- Table: stands
+-- Table: kermesses 
+CREATE TABLE "kermesses" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" INTEGER NOT NULL REFERENCES "users"("id"),
+  "name" VARCHAR(255) NOT NULL,
+  "description" TEXT DEFAULT '',
+  "statut" statut_enum NOT NULL DEFAULT 'STARTED'
+);
+
+-- Table: stands 
 CREATE TABLE "stands" (
   "id" SERIAL PRIMARY KEY,
   "user_id" INTEGER NOT NULL REFERENCES "users"("id"),
@@ -26,11 +35,18 @@ CREATE TABLE "stands" (
   "stock" INTEGER NOT NULL DEFAULT 0
 );
 
--- Table: kermesses
-CREATE TABLE "kermesses" (
+-- Table de liaison entre les kermesses et les utilisateurs
+CREATE TABLE "kermesses_users" (
   "id" SERIAL PRIMARY KEY,
+  "kermesse_id" INTEGER NOT NULL REFERENCES "kermesses"("id"),
   "user_id" INTEGER NOT NULL REFERENCES "users"("id"),
-  "name" VARCHAR(255) NOT NULL,
-  "description" TEXT DEFAULT '',
-  "statut" statut_enum NOT NULL DEFAULT 'STARTED'
+  UNIQUE ("kermesse_id", "user_id")
+);
+
+-- Table de liaison entre les kermesses et les stands
+CREATE TABLE "kermesses_stands" (
+  "id" SERIAL PRIMARY KEY,
+  "kermesse_id" INTEGER NOT NULL REFERENCES "kermesses"("id"),
+  "stand_id" INTEGER NOT NULL REFERENCES "stands"("id"),
+  UNIQUE ("kermesse_id", "stand_id")
 );

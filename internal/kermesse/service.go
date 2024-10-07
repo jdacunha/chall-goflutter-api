@@ -15,6 +15,8 @@ type KermesseService interface {
 	Get(ctx context.Context, id int) (types.Kermesse, error)
 	Create(ctx context.Context, input map[string]interface{}) error
 	Update(ctx context.Context, id int, input map[string]interface{}) error
+	AddParticipant(ctx context.Context, input map[string]interface{}) error
+	AddStand(ctx context.Context, input map[string]interface{}) error
 }
 
 type Service struct {
@@ -110,6 +112,30 @@ func (s *Service) Update(ctx context.Context, id int, input map[string]interface
 	}
 
 	err = s.store.Update(id, input)
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) AddParticipant(ctx context.Context, input map[string]interface{}) error {
+	err := s.store.AddParticipant(input)
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) AddStand(ctx context.Context, input map[string]interface{}) error {
+	err := s.store.AddStand(input)
 	if err != nil {
 		return errors.CustomError{
 			Key: errors.InternalServerError,
