@@ -17,10 +17,13 @@ import (
 )
 
 type UserService interface {
+	GetAll(ctx context.Context, params map[string]interface{}) ([]types.UserBasic, error)
+	GetChildren(ctx context.Context, params map[string]interface{}) ([]types.UserBasic, error)
 	Get(ctx context.Context, id int) (types.UserBasic, error)
+	UpdatePassword(ctx context.Context, id int, input map[string]interface{}) error
+	UpdateJetons(userId, credit int) error
 	Invite(ctx context.Context, input map[string]interface{}) error
 	Distribute(ctx context.Context, input map[string]interface{}) error
-
 	Register(ctx context.Context, input map[string]interface{}) error
 	Login(ctx context.Context, input map[string]interface{}) (types.UserBasicWithToken, error)
 	GetMe(ctx context.Context) (types.UserBasic, error)
@@ -34,6 +37,48 @@ func NewService(store UserStore) *Service {
 	return &Service{
 		store: store,
 	}
+}
+
+func (s *Service) GetAll(ctx context.Context, params map[string]interface{}) ([]types.UserBasic, error) {
+	filtres := map[string]interface{}{}
+	if params["kermesse_id"] != nil {
+		filtres["kermesse_id"] = params["kermesse_id"]
+	}
+
+	users, err := s.store.FindAll(filtres)
+	if err != nil {
+		return nil, errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return users, nil
+}
+
+func (s *Service) GetChildren(ctx context.Context, params map[string]interface{}) ([]types.UserBasic, error) {
+	filtres := map[string]interface{}{}
+	if params["kermesse_id"] != nil {
+		filtres["kermesse_id"] = params["kermesse_id"]
+	}
+
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
+		return nil, errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
+		}
+	}
+
+	users, err := s.store.FindChildren(userId, filtres)
+	if err != nil {
+		return nil, errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return users, nil
 }
 
 func (s *Service) Get(ctx context.Context, id int) (types.UserBasic, error) {
@@ -60,12 +105,97 @@ func (s *Service) Get(ctx context.Context, id int) (types.UserBasic, error) {
 	}, nil
 }
 
+func (s *Service) UpdatePassword(ctx context.Context, id int, input map[string]interface{}) error {
+	user, err := s.store.FindById(id)
+	if err != nil {
+		if goErrors.Is(err, sql.ErrNoRows) {
+			return errors.CustomError{
+				Key: errors.NotFound,
+				Err: err,
+			}
+		}
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
+		return errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
+		}
+	}
+	if user.Id != userId {
+		return errors.CustomError{
+			Key: errors.Forbidden,
+			Err: goErrors.New("Interdit"),
+		}
+	}
+
+	if !hasher.Compare(user.PasswordHash, input["password"].(string)) {
+		return errors.CustomError{
+			Key: errors.BadRequest,
+			Err: goErrors.New("Mot de passe incorrect"),
+		}
+	}
+
+	hashedPassword, err := hasher.Hash(input["new_password"].(string))
+	if err != nil {
+		return err
+	}
+	input["new_password"] = hashedPassword
+
+	err = s.store.UpdatePassword(id, input)
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) UpdateJetons(userId, credit int) error {
+	user, err := s.store.FindById(userId)
+	if err != nil {
+		if goErrors.Is(err, sql.ErrNoRows) {
+			return errors.CustomError{
+				Key: errors.NotFound,
+				Err: err,
+			}
+		}
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+	if user.Role != types.UserRoleParent {
+		return errors.CustomError{
+			Key: errors.Forbidden,
+			Err: goErrors.New("Interdit"),
+		}
+	}
+
+	err = s.store.UpdateJetons(userId, credit)
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
 func (s *Service) Invite(ctx context.Context, input map[string]interface{}) error {
 	_, err := s.store.FindByEmail(input["email"].(string))
 	if err == nil {
 		return errors.CustomError{
 			Key: errors.EmailAlreadyExists,
-			Err: goErrors.New("email already exists"),
+			Err: goErrors.New("Email déjà utilisé"),
 		}
 	}
 
@@ -86,7 +216,7 @@ func (s *Service) Invite(ctx context.Context, input map[string]interface{}) erro
 	if !ok {
 		return errors.CustomError{
 			Key: errors.Unauthorized,
-			Err: goErrors.New("user id not found in context"),
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
 		}
 	}
 
@@ -125,7 +255,7 @@ func (s *Service) Distribute(ctx context.Context, input map[string]interface{}) 
 		}
 		return errors.CustomError{
 			Key: errors.BadRequest,
-			Err: goErrors.New("child not found"),
+			Err: goErrors.New("Enfant non trouvé"),
 		}
 	}
 
@@ -133,7 +263,7 @@ func (s *Service) Distribute(ctx context.Context, input map[string]interface{}) 
 	if !ok {
 		return errors.CustomError{
 			Key: errors.Unauthorized,
-			Err: goErrors.New("user id not found in context"),
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
 		}
 	}
 	parent, err := s.store.FindById(parentId)
@@ -146,18 +276,18 @@ func (s *Service) Distribute(ctx context.Context, input map[string]interface{}) 
 		}
 		return errors.CustomError{
 			Key: errors.BadRequest,
-			Err: goErrors.New("parent not found"),
+			Err: goErrors.New("Parent non trouvé"),
 		}
 	}
 
 	if child.ParentId == nil || *child.ParentId != parent.Id {
 		return errors.CustomError{
 			Key: errors.Forbidden,
-			Err: goErrors.New("forbidden"),
+			Err: goErrors.New("Interdit"),
 		}
 	}
 
-	amount, error := utils.GetIntFromMap(input, "amount")
+	amount, error := utils.GetIntFromMap(input, "montant")
 	if error != nil {
 		return errors.CustomError{
 			Key: errors.BadRequest,
@@ -167,7 +297,7 @@ func (s *Service) Distribute(ctx context.Context, input map[string]interface{}) 
 	if parent.Jetons < amount {
 		return errors.CustomError{
 			Key: errors.BadRequest,
-			Err: goErrors.New("insufficient credit"),
+			Err: goErrors.New("Jetons insuffisants"),
 		}
 	}
 
@@ -195,7 +325,7 @@ func (s *Service) Register(ctx context.Context, input map[string]interface{}) er
 	if err == nil {
 		return errors.CustomError{
 			Key: errors.EmailAlreadyExists,
-			Err: goErrors.New("email already exists"),
+			Err: goErrors.New("Email déjà utilisé"),
 		}
 	}
 
@@ -209,7 +339,7 @@ func (s *Service) Register(ctx context.Context, input map[string]interface{}) er
 	if input["role"] == types.UserRoleEnfant {
 		return errors.CustomError{
 			Key: errors.BadRequest,
-			Err: goErrors.New("role cannot be child"),
+			Err: goErrors.New("Role non autorisé"),
 		}
 	}
 
@@ -242,7 +372,7 @@ func (s *Service) Login(ctx context.Context, input map[string]interface{}) (type
 	if !hasher.Compare(user.PasswordHash, input["password"].(string)) {
 		return types.UserBasicWithToken{}, errors.CustomError{
 			Key: errors.InvalidCredentials,
-			Err: goErrors.New("invalid credentials"),
+			Err: goErrors.New("Invalid credentials"),
 		}
 	}
 
@@ -283,7 +413,7 @@ func (s *Service) GetMe(ctx context.Context) (types.UserBasic, error) {
 	if !ok {
 		return types.UserBasic{}, errors.CustomError{
 			Key: errors.Unauthorized,
-			Err: goErrors.New("user id not found in context"),
+			Err: goErrors.New("Id utilisateur non trouvé dans le contexte"),
 		}
 	}
 

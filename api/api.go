@@ -5,6 +5,11 @@ import (
 	"net/http"
 
 	"github.com/chall-goflutter-api/api/handler"
+	"github.com/chall-goflutter-api/internal/interaction"
+	"github.com/chall-goflutter-api/internal/kermesse"
+	"github.com/chall-goflutter-api/internal/stand"
+	"github.com/chall-goflutter-api/internal/ticket"
+	"github.com/chall-goflutter-api/internal/tombola"
 	"github.com/chall-goflutter-api/internal/user"
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
@@ -35,6 +40,31 @@ func (s *APIServer) Start() error {
 	userService := user.NewService(userStore)
 	userHandler := handler.NewUserHandler(userService, userStore)
 	userHandler.RegisterRoutes(router)
+
+	standStore := stand.NewStore(s.db)
+	standService := stand.NewService(standStore)
+	standHandler := handler.NewStandHandler(standService, userStore)
+	standHandler.RegisterRoutes(router)
+
+	kermesseStore := kermesse.NewStore(s.db)
+	kermesseService := kermesse.NewService(kermesseStore, userStore)
+	kermesseHandler := handler.NewKermesseHandler(kermesseService, userStore)
+	kermesseHandler.RegisterRoutes(router)
+
+	interactionStore := interaction.NewStore(s.db)
+	interactionService := interaction.NewService(interactionStore, standStore, userStore, kermesseStore)
+	interactionHandler := handler.NewInteractionHandler(interactionService, userStore)
+	interactionHandler.RegisterRoutes(router)
+
+	tombolaStore := tombola.NewStore(s.db)
+	tombolaService := tombola.NewService(tombolaStore, kermesseStore)
+	tombolaHandler := handler.NewTombolaHandler(tombolaService, userStore)
+	tombolaHandler.RegisterRoutes(router)
+
+	ticketStore := ticket.NewStore(s.db)
+	ticketService := ticket.NewService(ticketStore, tombolaStore, userStore)
+	ticketHandler := handler.NewTicketHandler(ticketService, userStore)
+	ticketHandler.RegisterRoutes(router)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

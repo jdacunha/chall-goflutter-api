@@ -9,6 +9,7 @@ import (
 	"github.com/chall-goflutter-api/internal/user"
 	"github.com/chall-goflutter-api/pkg/errors"
 	"github.com/chall-goflutter-api/pkg/json"
+	"github.com/chall-goflutter-api/pkg/utils"
 	"github.com/gorilla/mux"
 )
 
@@ -25,13 +26,47 @@ func NewUserHandler(service user.UserService, store user.UserStore) *UserHandler
 }
 
 func (h *UserHandler) RegisterRoutes(mux *mux.Router) {
+	mux.Handle("/users", errors.ErrorHandler(middleware.IsAuth(h.GetAll, h.store))).Methods(http.MethodGet)
+	mux.Handle("/users/children", errors.ErrorHandler(middleware.IsAuth(h.GetChildren, h.store, types.UserRoleParent))).Methods(http.MethodGet)
 	mux.Handle("/users/{id}", errors.ErrorHandler(middleware.IsAuth(h.Get, h.store))).Methods(http.MethodGet)
 	mux.Handle("/users/invite", errors.ErrorHandler(middleware.IsAuth(h.Invite, h.store, types.UserRoleParent))).Methods(http.MethodPost)
 	mux.Handle("/users/distribute", errors.ErrorHandler(middleware.IsAuth(h.Distribute, h.store, types.UserRoleParent))).Methods(http.MethodPatch)
-
+	mux.Handle("/users/{id}/password", errors.ErrorHandler(middleware.IsAuth(h.UpdatePassword, h.store))).Methods(http.MethodPatch)
 	mux.Handle("/register", errors.ErrorHandler(h.Register)).Methods(http.MethodPost)
 	mux.Handle("/login", errors.ErrorHandler(h.Login)).Methods(http.MethodPost)
 	mux.Handle("/me", errors.ErrorHandler(middleware.IsAuth(h.GetMe, h.store))).Methods(http.MethodGet)
+}
+
+func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) error {
+	users, err := h.service.GetAll(r.Context(), utils.GetQueryParams(r))
+	if err != nil {
+		return err
+	}
+
+	if err := json.Write(w, http.StatusOK, users); err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (h *UserHandler) GetChildren(w http.ResponseWriter, r *http.Request) error {
+	users, err := h.service.GetChildren(r.Context(), utils.GetQueryParams(r))
+	if err != nil {
+		return err
+	}
+
+	if err := json.Write(w, http.StatusOK, users); err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
 }
 
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) error {
@@ -92,6 +127,38 @@ func (h *UserHandler) Distribute(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if err := h.service.Distribute(r.Context(), input); err != nil {
+		return err
+	}
+
+	if err := json.Write(w, http.StatusAccepted, nil); err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) error {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	var input map[string]interface{}
+	if err := json.Parse(r, &input); err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	if err := h.service.UpdatePassword(r.Context(), id, input); err != nil {
 		return err
 	}
 

@@ -1,8 +1,8 @@
 package kermesse
 
 import (
+	"github.com/chall-goflutter-api/internal/types"
 	"github.com/jmoiron/sqlx"
-	"github.com/kermanager/internal/types"
 )
 
 type KermesseStore interface {
@@ -10,6 +10,8 @@ type KermesseStore interface {
 	FindById(id int) (types.Kermesse, error)
 	Create(input map[string]interface{}) error
 	Update(id int, input map[string]interface{}) error
+	AddParticipant(input map[string]interface{}) error
+	AddStand(input map[string]interface{}) error
 }
 
 type Store struct {

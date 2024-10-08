@@ -88,11 +88,11 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 		}
 	}
 
-	userId, err := utils.GetIntFromMap(input, "user_id")
-	if err != nil {
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
 		return errors.CustomError{
-			Key: errors.BadRequest,
-			Err: err,
+			Key: errors.Unauthorized,
+			Err: goErrors.New("user id not found in context"),
 		}
 	}
 	user, err := s.userStore.FindById(userId)
@@ -109,7 +109,8 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 		}
 	}
 
-	if stand.Type == types.InteractionTypeTransaction {
+	totalPrice := stand.Price
+	if stand.Type == types.StandTypeVente {
 		quantity, err := utils.GetIntFromMap(input, "quantity")
 		if err != nil {
 			return errors.CustomError{
@@ -117,13 +118,24 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 				Err: err,
 			}
 		}
-		// mettre à jour le stock du stand
+		// Check si le stand a assez de stock
 		if stand.Stock < quantity {
 			return errors.CustomError{
 				Key: errors.BadRequest,
 				Err: goErrors.New("Pas assez de stock"),
 			}
 		}
+
+		// Check si l'utilisateur a assez de jetons
+		totalPrice = stand.Price * quantity
+		if user.Jetons < totalPrice {
+			return errors.CustomError{
+				Key: errors.BadRequest,
+				Err: goErrors.New("Pas assez de jetons"),
+			}
+		}
+
+		// mettre à jour le stock du stand et les jetons de l'utilisateur
 		err = s.standStore.UpdateStock(standId, -quantity)
 		if err != nil {
 			return errors.CustomError{
@@ -131,8 +143,25 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 				Err: err,
 			}
 		}
+		err = s.userStore.UpdateJetons(userId, -totalPrice)
+		if err != nil {
+			return errors.CustomError{
+				Key: errors.InternalServerError,
+				Err: err,
+			}
+		}
+
+		// Ajouter les jetons au propriétaire du stand
+		err = s.userStore.UpdateJetons(stand.UserId, totalPrice)
+		if err != nil {
+			return errors.CustomError{
+				Key: errors.InternalServerError,
+				Err: err,
+			}
+		}
+
+	} else {
 		// mettre à jour les jetons de l'utilisateur
-		totalPrice := stand.Price * quantity
 		if user.Jetons < totalPrice {
 			return errors.CustomError{
 				Key: errors.BadRequest,
@@ -146,16 +175,9 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 				Err: err,
 			}
 		}
-	} else {
-		// mettre à jour les jetons de l'utilisateur
-		totalPrice := stand.Price
-		if user.Jetons < totalPrice {
-			return errors.CustomError{
-				Key: errors.BadRequest,
-				Err: goErrors.New("Pas assez de jetons"),
-			}
-		}
-		err = s.userStore.UpdateJetons(userId, -totalPrice)
+
+		// Ajouter les jetons au propriétaire du stand
+		err = s.userStore.UpdateJetons(stand.UserId, totalPrice)
 		if err != nil {
 			return errors.CustomError{
 				Key: errors.InternalServerError,
@@ -164,7 +186,14 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 		}
 	}
 
-	input["type"] = stand.Type
+	if stand.Type == types.StandTypeVente {
+		input["type"] = types.InteractionTypeTransaction
+	} else {
+		input["type"] = types.InteractionTypeActivite
+	}
+	input["user_id"] = user.Id
+	input["jetons"] = totalPrice
+
 	err = s.store.Create(input)
 	if err != nil {
 		return errors.CustomError{
