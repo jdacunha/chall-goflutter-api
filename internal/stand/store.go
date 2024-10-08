@@ -1,16 +1,20 @@
 package stand
 
 import (
+	"fmt"
+
 	"github.com/chall-goflutter-api/internal/types"
 	"github.com/jmoiron/sqlx"
 )
 
 type StandStore interface {
-	FindAll() ([]types.Stand, error)
+	FindAll(filtres map[string]interface{}) ([]types.Stand, error)
 	FindById(id int) (types.Stand, error)
 	Create(input map[string]interface{}) error
 	Update(id int, input map[string]interface{}) error
 	UpdateStock(id int, n int) error
+	FindByUserId(id int) (types.Stand, error)
+	UpdateByUserId(userId int, input map[string]interface{}) error
 }
 
 type Store struct {
@@ -24,16 +28,46 @@ func NewStore(db *sqlx.DB) *Store {
 }
 
 const (
-	queryFindAllStands = "SELECT * FROM stands"
-	queryFindStandById = "SELECT * FROM stands WHERE id=$1"
-	queryCreateStand   = "INSERT INTO stands (user_id, name, description, type, price, stock) VALUES ($1, $2, $3, $4, $5, $6)"
-	queryUpdateStand   = "UPDATE stands SET name=$1, description=$2, price=$3, stock=$4 WHERE id=$5"
-	queryUpdateStock   = "UPDATE stands SET stock=stock+$1 WHERE id=$2"
+	queryFindStandById  = "SELECT * FROM stands WHERE id=$1"
+	queryCreateStand    = "INSERT INTO stands (user_id, name, description, type, price, stock) VALUES ($1, $2, $3, $4, $5, $6)"
+	queryUpdateStand    = "UPDATE stands SET name=$1, description=$2, price=$3, stock=$4 WHERE id=$5"
+	queryUpdateStock    = "UPDATE stands SET stock=stock+$1 WHERE id=$2"
+	queryFindByUserId   = "SELECT * FROM stands WHERE user_id=$1 LIMIT 1"
+	queryUpdateByUserId = "UPDATE stands SET name=$1, description=$2, price=$3, stock=$4 WHERE user_id=$5"
 )
 
-func (s *Store) FindAll() ([]types.Stand, error) {
+func (s *Store) FindAll(filtres map[string]interface{}) ([]types.Stand, error) {
 	stands := []types.Stand{}
-	err := s.db.Select(&stands, queryFindAllStands)
+	query := `
+		SELECT DISTINCT
+			s.id AS id,
+			s.user_id AS user_id,
+			s.name AS name,
+			s.description AS description,
+			s.type AS type,
+			s.price AS price,
+			s.stock AS stock
+		FROM stands s
+		LEFT JOIN kermesses_stands ks ON s.id = ks.stand_id
+		WHERE 1=1 AND s.id IS NOT NULL
+	`
+	if filtres["kermesse_id"] != nil {
+		query += fmt.Sprintf(" AND ks.kermesse_id IS NOT NULL AND ks.kermesse_id = %v", filtres["kermesse_id"])
+	}
+	if filtres["is_libre"] != nil {
+		query += `
+			AND (
+				ks.kermesse_id IS NULL
+				OR s.id NOT IN (
+					SELECT ks_inner.stand_id 
+					FROM kermesses_stands ks_inner
+					JOIN kermesses k ON ks_inner.kermesse_id = k.id
+					WHERE k.statut = 'STARTED'
+				)
+			)
+    `
+	}
+	err := s.db.Select(&stands, query)
 
 	return stands, err
 }
@@ -59,6 +93,19 @@ func (s *Store) Update(id int, input map[string]interface{}) error {
 
 func (s *Store) UpdateStock(id int, quantity int) error {
 	_, err := s.db.Exec(queryUpdateStock, quantity, id)
+
+	return err
+}
+
+func (s *Store) FindByUserId(userId int) (types.Stand, error) {
+	stand := types.Stand{}
+	err := s.db.Get(&stand, queryFindByUserId, userId)
+
+	return stand, err
+}
+
+func (s *Store) UpdateByUserId(userId int, input map[string]interface{}) error {
+	_, err := s.db.Exec(queryUpdateByUserId, input["name"], input["description"], input["price"], input["stock"], userId)
 
 	return err
 }

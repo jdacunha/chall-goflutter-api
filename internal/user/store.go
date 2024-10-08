@@ -8,8 +8,8 @@ import (
 )
 
 type UserStore interface {
-	FindAll(filters map[string]interface{}) ([]types.UserBasic, error)
-	FindChildren(id int, filters map[string]interface{}) ([]types.UserBasic, error)
+	FindAll(filtres map[string]interface{}) ([]types.UserBasic, error)
+	FindChildren(id int, filtres map[string]interface{}) ([]types.UserBasic, error)
 	FindById(id int) (types.User, error)
 	FindByEmail(email string) (types.User, error)
 	Create(input map[string]interface{}) error
@@ -27,7 +27,7 @@ func NewStore(db *sqlx.DB) *Store {
 	}
 }
 
-func (s *Store) FindAll(filters map[string]interface{}) ([]types.UserBasic, error) {
+func (s *Store) FindAll(filtres map[string]interface{}) ([]types.UserBasic, error) {
 	users := []types.UserBasic{}
 	query := `
 		SELECT DISTINCT
@@ -40,15 +40,15 @@ func (s *Store) FindAll(filters map[string]interface{}) ([]types.UserBasic, erro
 		FULL OUTER JOIN kermesses_users ku ON u.id = ku.user_id
 		WHERE 1=1
 	`
-	if filters["kermesse_id"] != nil {
-		query += fmt.Sprintf(" AND ku.kermesse_id = %v", filters["kermesse_id"])
+	if filtres["kermesse_id"] != nil {
+		query += fmt.Sprintf(" AND ku.kermesse_id = %v", filtres["kermesse_id"])
 	}
 	err := s.db.Select(&users, query)
 
 	return users, err
 }
 
-func (s *Store) FindChildren(id int, filters map[string]interface{}) ([]types.UserBasic, error) {
+func (s *Store) FindChildren(id int, filtres map[string]interface{}) ([]types.UserBasic, error) {
 	users := []types.UserBasic{}
 	query := `
 		SELECT DISTINCT
@@ -61,8 +61,8 @@ func (s *Store) FindChildren(id int, filters map[string]interface{}) ([]types.Us
 		FULL OUTER JOIN kermesses_users ku ON u.id = ku.user_id
 		WHERE u.role=$1 AND u.parent_id=$2
 	`
-	if filters["kermesse_id"] != nil {
-		query += fmt.Sprintf(" AND ku.kermesse_id = %v", filters["kermesse_id"])
+	if filtres["kermesse_id"] != nil {
+		query += fmt.Sprintf(" AND ku.kermesse_id = %v", filtres["kermesse_id"])
 	}
 	err := s.db.Select(&users, query, types.UserRoleEnfant, id)
 

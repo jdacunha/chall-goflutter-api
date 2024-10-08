@@ -10,6 +10,7 @@ import (
 	"github.com/chall-goflutter-api/internal/user"
 	"github.com/chall-goflutter-api/pkg/errors"
 	"github.com/chall-goflutter-api/pkg/json"
+	"github.com/chall-goflutter-api/pkg/utils"
 	"github.com/gorilla/mux"
 )
 
@@ -27,18 +28,35 @@ func NewStandHandler(service stand.StandService, userStore user.UserStore) *Stan
 
 func (h *StandHandler) RegisterRoutes(mux *mux.Router) {
 	mux.Handle("/stands", errors.ErrorHandler(middleware.IsAuth(h.GetAll, h.userStore))).Methods(http.MethodGet)
+	mux.Handle("/stands/actuel", errors.ErrorHandler(middleware.IsAuth(h.GetCurrent, h.userStore, types.UserRoleTeneurStand))).Methods(http.MethodGet)
 	mux.Handle("/stands/{id}", errors.ErrorHandler(middleware.IsAuth(h.Get, h.userStore))).Methods(http.MethodGet)
 	mux.Handle("/stands", errors.ErrorHandler(middleware.IsAuth(h.Create, h.userStore, types.UserRoleTeneurStand))).Methods(http.MethodPost)
-	mux.Handle("/stands/{id}", errors.ErrorHandler(middleware.IsAuth(h.Update, h.userStore, types.UserRoleTeneurStand))).Methods(http.MethodPatch)
+	mux.Handle("/stands", errors.ErrorHandler(middleware.IsAuth(h.Update, h.userStore, types.UserRoleTeneurStand))).Methods(http.MethodPatch)
 }
 
 func (h *StandHandler) GetAll(w http.ResponseWriter, r *http.Request) error {
-	stands, err := h.service.GetAll(r.Context())
+	stands, err := h.service.GetAll(r.Context(), utils.GetQueryParams(r))
 	if err != nil {
 		return err
 	}
 
 	if err := json.Write(w, http.StatusOK, stands); err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (h *StandHandler) GetCurrent(w http.ResponseWriter, r *http.Request) error {
+	stand, err := h.service.GetCurrent(r.Context())
+	if err != nil {
+		return err
+	}
+
+	if err := json.Write(w, http.StatusOK, stand); err != nil {
 		return errors.CustomError{
 			Key: errors.InternalServerError,
 			Err: err,
@@ -97,15 +115,6 @@ func (h *StandHandler) Create(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *StandHandler) Update(w http.ResponseWriter, r *http.Request) error {
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
-	if err != nil {
-		return errors.CustomError{
-			Key: errors.InternalServerError,
-			Err: err,
-		}
-	}
-
 	var input map[string]interface{}
 	if err := json.Parse(r, &input); err != nil {
 		return errors.CustomError{
@@ -114,7 +123,7 @@ func (h *StandHandler) Update(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	if err := h.service.Update(r.Context(), id, input); err != nil {
+	if err := h.service.UpdateCurrent(r.Context(), input); err != nil {
 		return err
 	}
 

@@ -10,10 +10,12 @@ import (
 )
 
 type StandService interface {
-	GetAll(ctx context.Context) ([]types.Stand, error)
+	GetAll(ctx context.Context, params map[string]interface{}) ([]types.Stand, error)
 	Get(ctx context.Context, id int) (types.Stand, error)
 	Create(ctx context.Context, input map[string]interface{}) error
 	Update(ctx context.Context, id int, input map[string]interface{}) error
+	GetCurrent(ctx context.Context) (types.Stand, error)
+	UpdateCurrent(ctx context.Context, input map[string]interface{}) error
 }
 
 type Service struct {
@@ -26,8 +28,16 @@ func NewService(store StandStore) *Service {
 	}
 }
 
-func (s *Service) GetAll(ctx context.Context) ([]types.Stand, error) {
-	stands, err := s.store.FindAll()
+func (s *Service) GetAll(ctx context.Context, params map[string]interface{}) ([]types.Stand, error) {
+	filtres := map[string]interface{}{}
+	if params["kermesse_id"] != nil {
+		filtres["kermesse_id"] = params["kermesse_id"]
+	}
+	if params["is_libre"] != nil {
+		filtres["is_libre"] = params["is_libre"]
+	}
+
+	stands, err := s.store.FindAll(params)
 	if err != nil {
 		return nil, errors.CustomError{
 			Key: errors.InternalServerError,
@@ -107,6 +117,52 @@ func (s *Service) Update(ctx context.Context, id int, input map[string]interface
 	}
 
 	err = s.store.Update(id, input)
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) GetCurrent(ctx context.Context) (types.Stand, error) {
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
+		return types.Stand{}, errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
+		}
+	}
+
+	stand, err := s.store.FindByUserId(userId)
+	if err != nil {
+		if goErrors.Is(err, sql.ErrNoRows) {
+			return stand, errors.CustomError{
+				Key: errors.NotFound,
+				Err: err,
+			}
+		}
+		return stand, errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return stand, nil
+}
+
+func (s *Service) UpdateCurrent(ctx context.Context, input map[string]interface{}) error {
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
+		return errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
+		}
+	}
+
+	err := s.store.UpdateByUserId(userId, input)
 	if err != nil {
 		return errors.CustomError{
 			Key: errors.InternalServerError,
