@@ -13,7 +13,7 @@ type Interaction struct {
 	KermesseId int    `json:"kermesse_id" db:"kermesse_id"`
 	StandId    int    `json:"stand_id" db:"stand_id"`
 	Type       string `json:"type" db:"type"`
-	Status     string `json:"status" db:"status"`
+	Statut     string `json:"statut" db:"statut"`
 	Jetons     int    `json:"jetons" db:"jetons"`
 	Points     int    `json:"points" db:"points"`
 }
