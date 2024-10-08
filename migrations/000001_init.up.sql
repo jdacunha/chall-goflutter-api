@@ -28,7 +28,7 @@ CREATE TABLE "kermesses" (
 -- Table: stands 
 CREATE TABLE "stands" (
   "id" SERIAL PRIMARY KEY,
-  "user_id" INTEGER NOT NULL REFERENCES "users"("id"),
+  "user_id" INTEGER NOT NULL UNIQUE REFERENCES "users"("id"),
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT DEFAULT '',
   "type" stand_type_enum NOT NULL,
@@ -61,7 +61,8 @@ CREATE TABLE "interactions" (
   "type" interaction_type_enum NOT NULL,
   "statut" statut_enum NOT NULL DEFAULT 'STARTED',
   "jetons" INTEGER NOT NULL DEFAULT 0,
-  "points" INTEGER NOT NULL DEFAULT 0
+  "points" INTEGER NOT NULL DEFAULT 0,
+  "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 --- Table: Tombolas
@@ -79,5 +80,6 @@ CREATE TABLE "tickets" (
   "id" SERIAL PRIMARY KEY,
   "user_id" INTEGER NOT NULL REFERENCES "users"("id"),
   "tombola_id" INTEGER NOT NULL REFERENCES "tombolas"("id"),
-  "gagnant" BOOLEAN NOT NULL DEFAULT FALSE
+  "gagnant" BOOLEAN NOT NULL DEFAULT FALSE,
+  "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
