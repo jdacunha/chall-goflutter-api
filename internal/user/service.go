@@ -26,7 +26,7 @@ type UserService interface {
 	Distribute(ctx context.Context, input map[string]interface{}) error
 	Register(ctx context.Context, input map[string]interface{}) error
 	Login(ctx context.Context, input map[string]interface{}) (types.UserBasicWithToken, error)
-	GetMe(ctx context.Context) (types.UserBasic, error)
+	GetMe(ctx context.Context) (types.UserBasicWithToken, error)
 }
 
 type Service struct {
@@ -398,20 +398,29 @@ func (s *Service) Login(ctx context.Context, input map[string]interface{}) (type
 		}
 	}
 
+	hasStand, err := s.store.HasStand(user.Id)
+	if err != nil {
+		return types.UserBasicWithToken{}, errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
 	return types.UserBasicWithToken{
-		Id:     user.Id,
-		Name:   user.Name,
-		Email:  user.Email,
-		Role:   user.Role,
-		Jetons: user.Jetons,
-		Token:  token,
+		Id:       user.Id,
+		Name:     user.Name,
+		Email:    user.Email,
+		Role:     user.Role,
+		Jetons:   user.Jetons,
+		Token:    token,
+		HasStand: hasStand,
 	}, nil
 }
 
-func (s *Service) GetMe(ctx context.Context) (types.UserBasic, error) {
+func (s *Service) GetMe(ctx context.Context) (types.UserBasicWithToken, error) {
 	userId, ok := ctx.Value(types.UserIDKey).(int)
 	if !ok {
-		return types.UserBasic{}, errors.CustomError{
+		return types.UserBasicWithToken{}, errors.CustomError{
 			Key: errors.Unauthorized,
 			Err: goErrors.New("Id utilisateur non trouvé dans le contexte"),
 		}
@@ -420,22 +429,32 @@ func (s *Service) GetMe(ctx context.Context) (types.UserBasic, error) {
 	user, err := s.store.FindById(userId)
 	if err != nil {
 		if goErrors.Is(err, sql.ErrNoRows) {
-			return types.UserBasic{}, errors.CustomError{
+			return types.UserBasicWithToken{}, errors.CustomError{
 				Key: errors.NotFound,
 				Err: err,
 			}
 		}
-		return types.UserBasic{}, errors.CustomError{
+		return types.UserBasicWithToken{}, errors.CustomError{
 			Key: errors.InternalServerError,
 			Err: err,
 		}
 	}
 
-	return types.UserBasic{
-		Id:     user.Id,
-		Name:   user.Name,
-		Email:  user.Email,
-		Role:   user.Role,
-		Jetons: user.Jetons,
+	hasStand, err := s.store.HasStand(userId)
+	if err != nil {
+		return types.UserBasicWithToken{}, errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return types.UserBasicWithToken{
+		Id:       user.Id,
+		Name:     user.Name,
+		Email:    user.Email,
+		Role:     user.Role,
+		Jetons:   user.Jetons,
+		Token:    "",
+		HasStand: hasStand,
 	}, nil
 }

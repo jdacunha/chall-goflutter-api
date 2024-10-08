@@ -33,10 +33,11 @@ type UserBasic struct {
 }
 
 type UserBasicWithToken struct {
-	Id     int    `json:"id" db:"id"`
-	Name   string `json:"name" db:"name"`
-	Email  string `json:"email" db:"email"`
-	Role   string `json:"role" db:"role"`
-	Jetons int    `json:"jetons" db:"jetons"`
-	Token  string `json:"token"`
+	Id       int    `json:"id" db:"id"`
+	Name     string `json:"name" db:"name"`
+	Email    string `json:"email" db:"email"`
+	Role     string `json:"role" db:"role"`
+	Jetons   int    `json:"jetons" db:"jetons"`
+	Token    string `json:"token"`
+	HasStand bool   `json:"has_stand"`
 }
