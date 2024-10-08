@@ -28,10 +28,12 @@ func NewKermesseHandler(service kermesse.KermesseService, userStore user.UserSto
 func (h *KermesseHandler) RegisterRoutes(mux *mux.Router) {
 	mux.Handle("/kermesses", errors.ErrorHandler(middleware.IsAuth(h.GetAll, h.userStore))).Methods(http.MethodGet)
 	mux.Handle("/kermesses/{id}", errors.ErrorHandler(middleware.IsAuth(h.Get, h.userStore))).Methods(http.MethodGet)
+	mux.Handle("/kermesses/{id}/users", errors.ErrorHandler(middleware.IsAuth(h.GetUsersInvite, h.userStore))).Methods(http.MethodGet)
 	mux.Handle("/kermesses", errors.ErrorHandler(middleware.IsAuth(h.Create, h.userStore, types.UserRoleOrganisateur))).Methods(http.MethodPost)
 	mux.Handle("/kermesses/{id}", errors.ErrorHandler(middleware.IsAuth(h.Update, h.userStore, types.UserRoleOrganisateur))).Methods(http.MethodPatch)
 	mux.Handle("/kermesses/{id}/participant", errors.ErrorHandler(middleware.IsAuth(h.AddParticipant, h.userStore))).Methods(http.MethodPost)
 	mux.Handle("/kermesses/{id}/stand", errors.ErrorHandler(middleware.IsAuth(h.AddStand, h.userStore))).Methods(http.MethodPost)
+	mux.Handle("/kermesses/{id}/end", errors.ErrorHandler(middleware.IsAuth(h.End, h.userStore, types.UserRoleOrganisateur))).Methods(http.MethodPatch)
 }
 
 func (h *KermesseHandler) GetAll(w http.ResponseWriter, r *http.Request) error {
@@ -66,6 +68,31 @@ func (h *KermesseHandler) Get(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if err := json.Write(w, http.StatusOK, kermesse); err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (h *KermesseHandler) GetUsersInvite(w http.ResponseWriter, r *http.Request) error {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	users, err := h.service.GetUsersInvite(r.Context(), id)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Write(w, http.StatusOK, users); err != nil {
 		return errors.CustomError{
 			Key: errors.InternalServerError,
 			Err: err,
@@ -187,6 +214,30 @@ func (h *KermesseHandler) AddStand(w http.ResponseWriter, r *http.Request) error
 	}
 
 	if err := json.Write(w, http.StatusCreated, nil); err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	return nil
+}
+
+func (h *KermesseHandler) End(w http.ResponseWriter, r *http.Request) error {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	if err := h.service.End(r.Context(), id); err != nil {
+		return err
+	}
+
+	if err := json.Write(w, http.StatusAccepted, nil); err != nil {
 		return errors.CustomError{
 			Key: errors.InternalServerError,
 			Err: err,
