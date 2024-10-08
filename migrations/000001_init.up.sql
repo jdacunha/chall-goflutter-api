@@ -63,3 +63,21 @@ CREATE TABLE "interactions" (
   "jetons" INTEGER NOT NULL DEFAULT 0,
   "points" INTEGER NOT NULL DEFAULT 0
 );
+
+--- Table: Tombolas
+CREATE TABLE "tombolas" (
+  "id" SERIAL PRIMARY KEY,
+  "kermesse_id" INTEGER NOT NULL UNIQUE REFERENCES "kermesses"("id"),
+  "name" VARCHAR(255) NOT NULL,
+  "statut" statut_enum NOT NULL DEFAULT 'STARTED',
+  "price" INTEGER NOT NULL DEFAULT 0,
+  "lot" VARCHAR(255) NOT NULL
+);
+
+--- Table: Tickets
+CREATE TABLE "tickets" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" INTEGER NOT NULL REFERENCES "users"("id"),
+  "tombola_id" INTEGER NOT NULL REFERENCES "tombolas"("id"),
+  "gagnant" BOOLEAN NOT NULL DEFAULT FALSE
+);
