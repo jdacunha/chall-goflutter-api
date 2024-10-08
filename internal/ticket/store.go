@@ -1,12 +1,14 @@
 package ticket
 
 import (
+	"fmt"
+
 	"github.com/chall-goflutter-api/internal/types"
 	"github.com/jmoiron/sqlx"
 )
 
 type TicketStore interface {
-	FindAll() ([]types.Ticket, error)
+	FindAll(filters map[string]interface{}) ([]types.Ticket, error)
 	FindById(id int) (types.Ticket, error)
 	Create(input map[string]interface{}) error
 	CanCreate(input map[string]interface{}) (bool, error)
@@ -23,21 +25,74 @@ func NewStore(db *sqlx.DB) *Store {
 }
 
 const (
-	queryFindAllTickets = "SELECT * FROM tickets"
-	queryFindTicketById = "SELECT * FROM tickets WHERE id=$1"
-	queryCreateTicket   = "INSERT INTO tickets (user_id, tombola_id) VALUES ($1, $2)"
+	queryCreateTicket = "INSERT INTO tickets (user_id, tombola_id) VALUES ($1, $2)"
 )
 
-func (s *Store) FindAll() ([]types.Ticket, error) {
+func (s *Store) FindAll(filters map[string]interface{}) ([]types.Ticket, error) {
 	tickets := []types.Ticket{}
-	err := s.db.Select(&tickets, queryFindAllTickets)
+	query := `
+		SELECT DISTINCT
+			t.id AS id,
+			t.gagnant AS gagnant,
+			u.id AS "user.id",
+			u.name AS "user.name",
+			u.email AS "user.email",
+			u.role AS "user.role",
+			tb.id AS "tombola.id",
+			tb.name AS "tombola.name",
+			tb.statut AS "tombola.statut",
+			tb.price AS "tombola.price",
+			tb.lot AS "tombola.lot",
+			k.id AS "kermesse.id",
+			k.name AS "kermesse.name",
+			k.description AS "kermesse.description",
+			k.statut AS "kermesse.statut"
+		FROM tickets t
+		JOIN users u ON t.user_id = u.id
+		JOIN tombolas tb ON t.tombola_id = tb.id
+		JOIN kermesses k ON tb.kermesse_id = k.id
+		WHERE 1=1
+	`
+	if filters["organisateur_id"] != nil {
+		query += fmt.Sprintf(" AND k.user_id IS NOT NULL AND k.user_id = %v", filters["organisateur_id"])
+	}
+	if filters["parent_id"] != nil {
+		query += fmt.Sprintf(" AND u.parent_id IS NOT NULL AND u.parent_id = %v", filters["parent_id"])
+	}
+	if filters["enfant_id"] != nil {
+		query += fmt.Sprintf(" AND t.user_id IS NOT NULL AND t.user_id = %v", filters["enfant_id"])
+	}
+	err := s.db.Select(&tickets, query)
 
 	return tickets, err
 }
 
 func (s *Store) FindById(id int) (types.Ticket, error) {
 	ticket := types.Ticket{}
-	err := s.db.Get(&ticket, queryFindTicketById, id)
+	query := `
+		SELECT
+			t.id AS id,
+			t.gagnant AS gagnant,
+			u.id AS "user.id",
+			u.name AS "user.name",
+			u.email AS "user.email",
+			u.role AS "user.role",
+			tb.id AS "tombola.id",
+			tb.name AS "tombola.name",
+			tb.statut AS "tombola.statut",
+			tb.price AS "tombola.price",
+			tb.lot AS "tombola.lot",
+			k.id AS "kermesse.id",
+			k.name AS "kermesse.name",
+			k.description AS "kermesse.description",
+			k.statut AS "kermesse.statut"
+		FROM tickets t
+		JOIN users u ON t.user_id = u.id
+		JOIN tombolas tb ON t.tombola_id = tb.id
+		JOIN kermesses k ON tb.kermesse_id = k.id
+		WHERE t.id=$1
+	`
+	err := s.db.Get(&ticket, query, id)
 
 	return ticket, err
 }

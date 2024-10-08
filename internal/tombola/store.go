@@ -1,12 +1,14 @@
 package tombola
 
 import (
+	"fmt"
+
 	"github.com/chall-goflutter-api/internal/types"
 	"github.com/jmoiron/sqlx"
 )
 
 type TombolaStore interface {
-	FindAll() ([]types.Tombola, error)
+	FindAll(filters map[string]interface{}) ([]types.Tombola, error)
 	FindById(id int) (types.Tombola, error)
 	Create(input map[string]interface{}) error
 	Update(id int, input map[string]interface{}) error
@@ -24,17 +26,29 @@ func NewStore(db *sqlx.DB) *Store {
 }
 
 const (
-	queryFindAllTombolas = "SELECT * FROM tombolas"
 	queryFindTombolaById = "SELECT * FROM tombolas WHERE id=$1"
 	queryCreateTombola   = "INSERT INTO tombolas (kermesse_id, name, price, lot) VALUES ($1, $2, $3, $4)"
 	queryUpdateTombola   = "UPDATE tombolas SET name=$1, price=$2, lot=$3 WHERE id=$4"
 	queryUpdateStatut    = "UPDATE tombolas SET statut=$1 WHERE id=$2"
 )
 
-func (s *Store) FindAll() ([]types.Tombola, error) {
+func (s *Store) FindAll(filters map[string]interface{}) ([]types.Tombola, error) {
 	tombolas := []types.Tombola{}
-	err := s.db.Select(&tombolas, queryFindAllTombolas)
-
+	query := `
+		SELECT DISTINCT
+			t.id AS id,
+			t.kermesse_id AS kermesse_id,
+			t.name AS name,
+			t.statut AS statut,
+			t.price AS price,
+			t.lot AS lot
+		FROM tombolas t
+		WHERE 1=1
+	`
+	if filters["kermesse_id"] != nil {
+		query += fmt.Sprintf(" AND t.kermesse_id = %v", filters["kermesse_id"])
+	}
+	err := s.db.Select(&tombolas, query)
 	return tombolas, err
 }
 

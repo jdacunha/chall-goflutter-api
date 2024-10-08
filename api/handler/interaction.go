@@ -10,6 +10,7 @@ import (
 	"github.com/chall-goflutter-api/internal/user"
 	"github.com/chall-goflutter-api/pkg/errors"
 	"github.com/chall-goflutter-api/pkg/json"
+	"github.com/chall-goflutter-api/pkg/utils"
 	"github.com/gorilla/mux"
 )
 
@@ -33,7 +34,7 @@ func (h *InteractionHandler) RegisterRoutes(mux *mux.Router) {
 }
 
 func (h *InteractionHandler) GetAll(w http.ResponseWriter, r *http.Request) error {
-	interactions, err := h.service.GetAll(r.Context())
+	interactions, err := h.service.GetAll(r.Context(), utils.GetQueryParams(r))
 	if err != nil {
 		return err
 	}

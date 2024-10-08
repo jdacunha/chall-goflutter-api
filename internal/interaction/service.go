@@ -14,7 +14,7 @@ import (
 )
 
 type InteractionService interface {
-	GetAll(ctx context.Context) ([]types.Interaction, error)
+	GetAll(ctx context.Context, params map[string]interface{}) ([]types.InteractionBasic, error)
 	Get(ctx context.Context, id int) (types.Interaction, error)
 	Create(ctx context.Context, input map[string]interface{}) error
 	Update(ctx context.Context, id int, input map[string]interface{}) error
@@ -36,8 +36,36 @@ func NewService(store InteractionStore, standStore stand.StandStore, userStore u
 	}
 }
 
-func (s *Service) GetAll(ctx context.Context) ([]types.Interaction, error) {
-	interactions, err := s.store.FindAll()
+func (s *Service) GetAll(ctx context.Context, params map[string]interface{}) ([]types.InteractionBasic, error) {
+
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
+		return nil, errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
+		}
+	}
+	userRole, ok := ctx.Value(types.UserRoleKey).(string)
+	if !ok {
+		return nil, errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
+		}
+	}
+
+	filters := map[string]interface{}{}
+	if userRole == types.UserRoleParent {
+		filters["parent_id"] = userId
+	} else if userRole == types.UserRoleEnfant {
+		filters["enfant_id"] = userId
+	} else if userRole == types.UserRoleTeneurStand {
+		filters["teneur_stand_id"] = userId
+	}
+	if params["kermesse_id"] != nil {
+		filters["kermesse_id"] = params["kermesse_id"]
+	}
+
+	interactions, err := s.store.FindAll(filters)
 	if err != nil {
 		return nil, errors.CustomError{
 			Key: errors.InternalServerError,
@@ -92,7 +120,7 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 	if !ok {
 		return errors.CustomError{
 			Key: errors.Unauthorized,
-			Err: goErrors.New("user id not found in context"),
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
 		}
 	}
 	user, err := s.userStore.FindById(userId)
@@ -106,6 +134,23 @@ func (s *Service) Create(ctx context.Context, input map[string]interface{}) erro
 		return errors.CustomError{
 			Key: errors.InternalServerError,
 			Err: err,
+		}
+	}
+
+	canCreate, err := s.store.CanCreate(map[string]interface{}{
+		"user_id":  userId,
+		"stand_id": standId,
+	})
+	if err != nil {
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+	if !canCreate {
+		return errors.CustomError{
+			Key: errors.Forbidden,
+			Err: goErrors.New("Interdit"),
 		}
 	}
 
@@ -224,6 +269,54 @@ func (s *Service) Update(ctx context.Context, id int, input map[string]interface
 		return errors.CustomError{
 			Key: errors.BadRequest,
 			Err: goErrors.New("L'interaction n'est pas une activité"),
+		}
+	}
+
+	kermesse, err := s.kermesseStore.FindById(interaction.Kermesse.Id)
+	if err != nil {
+		if goErrors.Is(err, sql.ErrNoRows) {
+			return errors.CustomError{
+				Key: errors.NotFound,
+				Err: err,
+			}
+		}
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+	if kermesse.Statut == types.KermesseStatutEnded {
+		return errors.CustomError{
+			Key: errors.BadRequest,
+			Err: goErrors.New("La kermesse est terminée"),
+		}
+	}
+
+	stand, err := s.standStore.FindById(interaction.Stand.Id)
+	if err != nil {
+		if goErrors.Is(err, sql.ErrNoRows) {
+			return errors.CustomError{
+				Key: errors.NotFound,
+				Err: err,
+			}
+		}
+		return errors.CustomError{
+			Key: errors.InternalServerError,
+			Err: err,
+		}
+	}
+
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
+		return errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("ID utilisateur non trouvé dans le contexte"),
+		}
+	}
+	if stand.UserId != userId {
+		return errors.CustomError{
+			Key: errors.Forbidden,
+			Err: goErrors.New("Interdit"),
 		}
 	}
 

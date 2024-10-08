@@ -33,7 +33,31 @@ func NewService(store TicketStore, tombolaStore tombola.TombolaStore, userStore 
 }
 
 func (s *Service) GetAll(ctx context.Context) ([]types.Ticket, error) {
-	tickets, err := s.store.FindAll()
+	userId, ok := ctx.Value(types.UserIDKey).(int)
+	if !ok {
+		return nil, errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("Id utilisateur non trouvé dans le contexte"),
+		}
+	}
+	userRole, ok := ctx.Value(types.UserRoleKey).(string)
+	if !ok {
+		return nil, errors.CustomError{
+			Key: errors.Unauthorized,
+			Err: goErrors.New("Role utilisateur non trouvé dans le contexte"),
+		}
+	}
+
+	filters := map[string]interface{}{}
+	if userRole == types.UserRoleOrganisateur {
+		filters["organisateur_id"] = userId
+	} else if userRole == types.UserRoleParent {
+		filters["parent_id"] = userId
+	} else if userRole == types.UserRoleEnfant {
+		filters["enfant_id"] = userId
+	}
+
+	tickets, err := s.store.FindAll(filters)
 	if err != nil {
 		return nil, errors.CustomError{
 			Key: errors.InternalServerError,
