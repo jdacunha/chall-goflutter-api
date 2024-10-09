@@ -12,3 +12,5 @@ require (
 	github.com/stripe/stripe-go v70.15.0+incompatible
 	golang.org/x/crypto v0.28.0
 )
+
+require github.com/stretchr/testify v1.9.0 // indirect
