@@ -9,5 +9,6 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/rs/cors v1.11.1
+	github.com/stripe/stripe-go v70.15.0+incompatible
 	golang.org/x/crypto v0.28.0
 )
