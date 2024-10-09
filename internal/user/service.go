@@ -9,7 +9,6 @@ import (
 
 	"github.com/chall-goflutter-api/internal/types"
 	"github.com/chall-goflutter-api/pkg/errors"
-	"github.com/chall-goflutter-api/pkg/generator"
 	"github.com/chall-goflutter-api/pkg/hasher"
 	"github.com/chall-goflutter-api/pkg/jwt"
 	"github.com/chall-goflutter-api/pkg/utils"
@@ -199,15 +198,7 @@ func (s *Service) Invite(ctx context.Context, input map[string]interface{}) erro
 		}
 	}
 
-	randomPassword, err := generator.RandomPassword(8)
-	if err != nil {
-		return errors.CustomError{
-			Key: errors.InternalServerError,
-			Err: err,
-		}
-	}
-
-	hashedPassword, err := hasher.Hash(randomPassword)
+	hashedPassword, err := hasher.Hash("securepassword123")
 	if err != nil {
 		return err
 	}
