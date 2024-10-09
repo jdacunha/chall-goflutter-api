@@ -9,8 +9,8 @@ import (
 
 type KermesseStore interface {
 	FindAll(filtres map[string]interface{}) ([]types.Kermesse, error)
-	FindById(id int) (types.Kermesse, error)
 	FindUsersInvite(id int) ([]types.UserBasic, error)
+	FindById(id int) (types.Kermesse, error)
 	Create(input map[string]interface{}) error
 	Update(id int, input map[string]interface{}) error
 	AddParticipant(input map[string]interface{}) error
@@ -74,13 +74,6 @@ func (s *Store) FindAll(filtres map[string]interface{}) ([]types.Kermesse, error
 	return kermesses, err
 }
 
-func (s *Store) FindById(id int) (types.Kermesse, error) {
-	kermesse := types.Kermesse{}
-	err := s.db.Get(&kermesse, queryFindKermesseById, id)
-
-	return kermesse, err
-}
-
 func (s *Store) FindUsersInvite(id int) ([]types.UserBasic, error) {
 	users := []types.UserBasic{}
 	query := `
@@ -91,12 +84,20 @@ func (s *Store) FindUsersInvite(id int) ([]types.UserBasic, error) {
 			u.role AS role,
 			u.jetons AS jetons
 		FROM users u
-		LEFT JOIN kermesses_users ku ON u.id = ku.user_id
-		WHERE u.id IS NOT NULL AND role='ENFANT' AND ku.kermesse_id IS NULL OR ku.kermesse_id != $1
+		LEFT JOIN kermesses_users ku ON u.id = ku.user_id AND ku.kermesse_id = $1
+		WHERE u.role = 'ENFANT'
+		AND ku.user_id IS NULL;
 	`
 	err := s.db.Select(&users, query, id)
 
 	return users, err
+}
+
+func (s *Store) FindById(id int) (types.Kermesse, error) {
+	kermesse := types.Kermesse{}
+	err := s.db.Get(&kermesse, queryFindKermesseById, id)
+
+	return kermesse, err
 }
 
 func (s *Store) Create(input map[string]interface{}) error {
